@@ -522,7 +522,14 @@ sapply(OTPset_test, function(x) sum(is.na(x)))
 OTPset_test <- newFeaturesData(OTPset_test)
 
 
-# загружаем библиотеку h2o
+# загружаем библиотеку h2o, 
+# перед загрузкой библиотеки h2o убедитесь, что библиотека h2o установлена 
+# (сначала установите Java SE Development Kit 8, обратите внимание, 
+# 9-я версия H2O не поддерживается, а затем после установки Java 
+# установите пакет h2o с помощью команды
+# install.packages("h2o", type="source", repos=(c("http://h2o-release.s3.amazonaws.com/h2o/latest_stable_R"))) и
+# затем загрузите библиотеку)
+
 library(h2o)
 h2o.init(nthreads=-1, max_mem_size = "8G")
 
