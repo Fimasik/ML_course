@@ -1,5 +1,4 @@
 # подключаем пакеты
-
 library(caret)
 library(dplyr)
 library(imputeMissings)
@@ -15,21 +14,17 @@ library(rcompanion)
 library(car)
 
 # создаем рабочее пространство с файлами выборки
-
 setwd("C:/Trees")
 
 # загружаем данные
-
-OTPset <- 
-  read.csv2("Credit_OTP.csv", stringsAsFactors = F)
-
-OTPset_test <- 
-  read.csv2("Credit_OTP_new.csv", stringsAsFactors = F)
+OTPset <- read.csv2("Credit_OTP.csv", stringsAsFactors = F)
+OTPset_test <- read.csv2("Credit_OTP_new.csv", stringsAsFactors = F)
 
 # смотрим количество уникальных значений у AGREEMENT_RK 
 length(unique(OTPset$AGREEMENT_RK))
+
 # удаляем переменную AGREEMENT_RK
-OTPset$AGREEMENT_RK = NULL
+OTPset$AGREEMENT_RK <- NULL
 
 # смотрим типы переменных
 str(OTPset)
@@ -90,14 +85,13 @@ preProcessData <-
         GEN_PHONE_FL = as.factor(GEN_PHONE_FL),
         PREVIOUS_CARD_NUM_UTILIZED =
           ifelse(is.na(PREVIOUS_CARD_NUM_UTILIZED), 0, PREVIOUS_CARD_NUM_UTILIZED),
-        ### факт совпадения фактического области проживания и торговой точки
+        # факт совпадения фактического области проживания и торговой точки
         FACT_TP_FL = as.factor(ifelse(FACT_ADDRESS_PROVINCE == TP_PROVINCE, 1, 0))
       )
     return(data)
   }
 
-# пишем аналогичную функцию предобработки 
-# для OTPset_test
+# пишем функцию предобработки для тестового набора
 preProcessDataTest <- 
   function(data) {
     data <- 
@@ -109,8 +103,6 @@ preProcessDataTest <-
         GENDER = as.factor(GENDER),
         MARITAL_STATUS = as.factor(MARITAL_STATUS),
         FAMILY_INCOME = as.numeric(as.factor(FAMILY_INCOME)),
-        GEN_INDUSTRY = ifelse(GEN_INDUSTRY == "Пропуск" & SOCSTATUS_PENS_FL == 1,
-                              "Пенсия", GEN_INDUSTRY),
         GEN_INDUSTRY = ifelse(GEN_INDUSTRY == "Пропуск" & SOCSTATUS_PENS_FL == 1,
                               "Пенсия", GEN_INDUSTRY),
         GEN_INDUSTRY = nonInformation(GEN_INDUSTRY),
@@ -151,25 +143,21 @@ preProcessDataTest <-
     return(data)
   }
 
-
 # применяем функции предобработки
 # к набору данных
 OTPset <- preProcessData(OTPset)
-# смотрим типы переменных
-str(OTPset)
+
 # выводим подробную информацию
 # о переменных
 Hmisc::describe(OTPset)
 
 # разбиваем на обучающую и тестовую выборки
-
 set.seed(45151)
 index = createDataPartition(OTPset$TARGET, p = 0.7, list = F)
 training <- OTPset[index,]
 testing <- OTPset[-index,]
 
-# анализируем редкие категории
-
+# пишем функцию для анализа редких категорий
 freqTable <- 
   function(variable) {
     FreqTable <- data.frame(table(variable))
@@ -177,39 +165,67 @@ freqTable <-
       FreqTable %>% 
       mutate(Share = Freq/sum(Freq)) %>%
       arrange(desc(Share)) %>%
-      mutate(Share2 = cumsum(Share))
+      mutate(Cumshare = cumsum(Share))
     return(FreqTable)
   }
 
+# выводим обычные и накопленные доли 
+# категорий переменной GEN_INDUSTRY, с помощью 
+# options(scipen=999) отключаем 
+# экспоненциальное представление чисел
+options(scipen=999)
 FreqGEN_INDUSTRY <- freqTable(training$GEN_INDUSTRY)
+FreqGEN_INDUSTRY
 
+# выводим частоты категорий переменной GEN_TITLE
 table(training$GEN_TITLE)
-FreqGEN_TITLE <- freqTable(training$GEN_TITLE) # оценка частоты и доли
-training %>% group_by(GEN_TITLE) %>%
-  summarise(PERSONAL_INCOME = mean(PERSONAL_INCOME)) # оценка по личному доходу
 
+# выводим обычные и накопленные доли 
+# категорий переменной GEN_TITLE
+FreqGEN_TITLE <- freqTable(training$GEN_TITLE)
+FreqGEN_TITLE
+
+# смотрим средний личный доход в каждой
+# категории переменной GEN_TITLE
+training %>% group_by(GEN_TITLE) %>%
+  summarise(PERSONAL_INCOME = mean(PERSONAL_INCOME))
+
+# выводим частоты категорий переменной ORG_TP_STATE
 table(training$ORG_TP_STATE)
 
+# выводим частоты категорий переменной REG_ADDRESS_PROVINCE
 table(training$REG_ADDRESS_PROVINCE)
-FreqREG_ADDRESS_PROVINCE <- 
-  freqTable(training$REG_ADDRESS_PROVINCE) # оценка частоты и доли
-FreqREG_ADDRESS_PROVINCE$variable
 
+# выводим обычные и накопленные доли 
+# категорий переменной REG_ADDRESS_PROVINCE
+FreqREG_ADDRESS_PROVINCE <- freqTable(training$REG_ADDRESS_PROVINCE)
+FreqREG_ADDRESS_PROVINCE
+
+# выводим частоты категорий переменной FACT_ADDRESS_PROVINCE
 table(training$FACT_ADDRESS_PROVINCE)
+
+# выводим частоты категорий переменной POSTAL_ADDRESS_PROVINCE
 table(training$POSTAL_ADDRESS_PROVINCE)
 
+# выводим частоты категорий переменной TP_PROVINCE
 table(training$TP_PROVINCE)
-TP_PROVINCE <- 
-  freqTable(training$TP_PROVINCE) # оценка частоты и доли
-TP_PROVINCE$variable
 
+# выводим обычные и накопленные доли 
+# категорий переменной TP_PROVINCE
+FreqTP_PROVINCE <- freqTable(training$TP_PROVINCE)
+FreqTP_PROVINCE
+
+# выводим частоты категорий переменной JOB_DIR
 table(training$JOB_DIR)
-JOB_DIR <- 
-  freqTable(training$JOB_DIR) 
 
+# выводим обычные и накопленные доли 
+# категорий переменной JOB_DIR
+FreqJOB_DIR <- freqTable(training$JOB_DIR) 
+
+# выводим частоты категорий переменной REGION_NM
 table(training$REGION_NM)
 
-# "редкие" регионы
+# пишем функцию по укрупнению "редких" регионов
 replaceRareRegion <- 
   function(region) {
     region = ifelse(region == "Москва" | region == "Хакасия" |
@@ -224,6 +240,7 @@ replaceRareRegion <-
     region = as.factor(region)
     return(region)
   }
+
 # пишем функцию по укрупнению редких категорий
 replaceRareClass <- 
   function(data) {
@@ -233,9 +250,9 @@ replaceRareClass <-
         EDUCATION = 
           as.factor(
             ifelse(EDUCATION == "Ученая степень" | 
-                             EDUCATION == "Два и более высших образования" |
-                             EDUCATION == "Высшее",
-                           "Высшее или несколько высших", EDUCATION)
+                     EDUCATION == "Два и более высших образования" |
+                     EDUCATION == "Высшее",
+                   "Высшее или несколько высших", EDUCATION)
           ),
         GEN_INDUSTRY = 
           as.factor(
@@ -289,8 +306,7 @@ replaceRareClass <-
 # категории, к обучающей выборке
 training <- replaceRareClass(training)
 
-# создаем функцию, обрабатывающую выбросы
-
+# пишем функцию, обрабатывающую выбросы
 replaceOutlier <- 
   function(data) {
     data <- 
@@ -317,29 +333,26 @@ sapply(training, function(x) sum(is.na(x)))
 # импутируем пропуски в количественных 
 # переменных медианами
 training[sapply(training, is.numeric)] <- lapply(training[sapply(training,  
-                                                     is.numeric)], function(x) 
-                                                       ifelse(is.na(x), 
-                                                              median(x, na.rm = TRUE), x))
+                                                                 is.numeric)], function(x) 
+                                                                   ifelse(is.na(x), 
+                                                                          median(x, na.rm = TRUE), x))
 # смотрим количество пропусков по каждой переменной
 # в обучающей выборке
 sapply(training, function(x) sum(is.na(x)))
 
-# смотрим типы переменных в обучающей выборке
-str(training)
-
-# выводим гистограмму распределения
-# для переменной CREDIT
+# выводим гистограмму распределения для переменной CREDIT 
+# с помощью функции plotNormalHistogram пакета rcompanion
 plotNormalHistogram(training$CREDIT)
 
-# выводим график квантиль-квантиль
-# для переменной CREDIT
+# выводим график квантиль-квантиль для переменной CREDIT
+# с помощью функций qqnorm и qqline
 qqnorm(training$CREDIT,
        ylab="Sample Quantiles")
 qqline(training$CREDIT, 
        col="red")
 
-# выполняем логарифмическое преобразование,
-# используем константу 0.01, чтобы не брать
+# выполняем логарифмическое преобразование переменной
+# CREDIT, используем константу 0.01, чтобы не брать
 # логарифм нуля
 var_log = log(training$CREDIT+0.01)
 
@@ -371,10 +384,11 @@ qqline(var_cube,
        col="red")
 
 # вычисляем лямбду преобразования Бокса-Кокса
+# с помощью функции powerTransform пакета car
 powerTransform(training$CREDIT)
 
-# выполняем преобразование с помощью
-# вычисленной лямбда
+# выполняем преобразование с помощью вычисленной лямбда,
+# используя функцию bcPower пакета car
 trans_var <-bcPower(training$CREDIT, -0.04163767)
 
 # выводим гистограмму распределения
@@ -443,9 +457,9 @@ sapply(testing, function(x) sum(is.na(x)))
 # импутируем пропуски в количественных 
 # переменных медианами
 testing[sapply(testing, is.numeric)] <- lapply(testing[sapply(testing,  
-                                                                 is.numeric)], function(x) 
-                                                                   ifelse(is.na(x), 
-                                                                          median(x, na.rm = TRUE), x))
+                                                              is.numeric)], function(x) 
+                                                                ifelse(is.na(x), 
+                                                                       median(x, na.rm = TRUE), x))
 
 # смотрим количество пропусков по каждой переменной
 # в тестовой выборке
@@ -455,13 +469,8 @@ sapply(testing, function(x) sum(is.na(x)))
 # к тестовой выборке
 testing <- newFeaturesData(testing)
 
-# смотрим типы переменных в тестовой выборке
-str(testing)
-
-
 # преобразовываем весь обучающий набор и итоговый тестовый набор
-
-# перевыгружаем данные для лучшей воспроизводимости
+# перевыгружаем данные
 OTPset <- read.csv2("Credit_OTP.csv", stringsAsFactors = F)
 OTPset_test <- read.csv2("Credit_OTP_new.csv", stringsAsFactors = F)
 
@@ -472,6 +481,7 @@ OTPset$AGREEMENT_RK = NULL
 OTPset <- preProcessData(OTPset)
 
 # применяем функцию, укрупняющую редкие
+
 # категории
 OTPset <- replaceRareClass(OTPset)
 
@@ -484,9 +494,9 @@ sapply(OTPset, function(x) sum(is.na(x)))
 # импутируем пропуски в количественных 
 # переменных медианами
 OTPset[sapply(OTPset, is.numeric)] <- lapply(OTPset[sapply(OTPset,  
-                                                              is.numeric)], function(x) 
-                                                                ifelse(is.na(x), 
-                                                                       median(x, na.rm = TRUE), x))
+                                                           is.numeric)], function(x) 
+                                                             ifelse(is.na(x), 
+                                                                    median(x, na.rm = TRUE), x))
 # смотрим количество пропусков по каждой переменной
 sapply(OTPset, function(x) sum(is.na(x)))
 
@@ -512,9 +522,9 @@ sapply(OTPset_test, function(x) sum(is.na(x)))
 # импутируем пропуски в количественных 
 # переменных медианами
 OTPset_test[sapply(OTPset_test, is.numeric)] <- lapply(OTPset_test[sapply(OTPset_test,  
-                                                           is.numeric)], function(x) 
-                                                             ifelse(is.na(x), 
-                                                                    median(x, na.rm = TRUE), x))
+                                                                          is.numeric)], function(x) 
+                                                                            ifelse(is.na(x), 
+                                                                                   median(x, na.rm = TRUE), x))
 # смотрим количество пропусков по каждой переменной
 sapply(OTPset_test, function(x) sum(is.na(x)))
 
@@ -534,7 +544,9 @@ library(h2o)
 h2o.init(nthreads=-1, max_mem_size = "8G")
 
 # смотрим датафреймы перед преобразованием
-# во фреймы H2O
+# во фреймы H2O, обратите внимание, h2o
+# не умеет обрабатывать упорядоченные факторы
+# (ordered factors)
 str(OTPset)
 str(OTPset_test)
 
@@ -542,10 +554,14 @@ str(OTPset_test)
 train <- as.h2o(OTPset)
 valid <- as.h2o(OTPset_test)
 
+# взглянем на обучающий фрейм h2o
+str(train)
+
 # строим модель логистической регрессии
 lr1 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
                x=c(2:65), y=1, seed = 1000000)
 
+# смотрим модель
 summary(lr1)
 
 # строим модель логистической регрессии 
@@ -553,21 +569,15 @@ summary(lr1)
 lr2 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
                x=c(2:65), y=1, seed = 1000000, lambda_search = TRUE)
 
+# смотрим модель
 summary(lr2)
-
-# строим модель логистической регрессии с перебором парных взаимодействий
-lr3 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
-               x=c(2:65), y=1, seed = 1000000, lambda_search = TRUE, 
-               interactions = c('GENDER', 'SOCSTATUS_PENS_FL', 'FAMILY_INCOME'))
-
-summary(lr3)
 
 # выполняем решетчатый поиск с перебором alpha и lambda,
 # alpha задает тип регуляризации: значение 1 соответствует 
 # l1-регуляризации (лассо), значение 0 соответствует 
 # l2-регуляризации (гребневой регрессии), 
 # промежуточное значение соответствует 
-# комбинации штрафов l1 и l2 (эластичной сети)
+# комбинации штрафов l1 и l2 (эластичной сети),
 # lambda задает силу штрафа
 hyper_parameters <- list(alpha = c(0, 0.2, 0.4, 0.6, 1))
 glm_grid <- h2o.grid(algorithm = "glm", grid_id = "gridresults", hyper_params = hyper_parameters, 
@@ -583,4 +593,5 @@ sortedGrid <- h2o.getGrid("gridresults", sort_by = "auc", decreasing = TRUE)
 # выводим результаты решетчатого поиска,
 # отсортировав по убыванию AUC
 sortedGrid
+
 
