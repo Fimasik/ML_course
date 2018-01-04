@@ -68,6 +68,7 @@ preProcessData <-
         JOB_DIR = nonInformation(JOB_DIR),
         TP_PROVINCE = nonInformation(TP_PROVINCE),
         REGION_NM = nonInformation(REGION_NM),
+        REGION_NM = ifelse(REGION_NM == "ПОВОЛЖСКИЙ", "ПРИВОЛЖСКИЙ", REGION_NM),
         REG_FACT_FL = as.factor(REG_FACT_FL),
         FACT_POST_FL = as.factor(FACT_POST_FL),
         REG_POST_FL = as.factor(REG_POST_FL),
@@ -120,6 +121,7 @@ preProcessDataTest <-
         JOB_DIR = nonInformation(JOB_DIR),
         TP_PROVINCE = nonInformation(TP_PROVINCE),
         REGION_NM = nonInformation(REGION_NM),
+        REGION_NM = ifelse(REGION_NM == "ПОВОЛЖСКИЙ", "ПРИВОЛЖСКИЙ", REGION_NM),
         REG_FACT_FL = as.factor(REG_FACT_FL),
         FACT_POST_FL = as.factor(FACT_POST_FL),
         REG_POST_FL = as.factor(REG_POST_FL),
@@ -233,7 +235,7 @@ replaceRareRegion <-
                       region == "Калмыкия" | region == "Дагестан" |
                       region == "Агинский Бурятский АО" | 
                       region == "Усть-Ордынский Бурятский АО" |
-                      region == "Эвенкийский АО" | region == "Коми-Пермяцкий АО" |
+                      region == "Эвенкийский АО" |
                       region == "Коми-Пермяцкий АО" | region == "Чечня", 
                     "Другие регионы",
                     region)
@@ -442,6 +444,9 @@ newFeaturesData <-
 # к обучающей выборке
 training <- newFeaturesData(training)
 
+# смотрим типы переменных
+str(training)
+
 # применяем функцию, укрупняющую редкие
 # категории, к обучающей выборке
 testing <- replaceRareClass(testing)
@@ -468,6 +473,9 @@ sapply(testing, function(x) sum(is.na(x)))
 # применяем функцию, создающую новые переменные,
 # к тестовой выборке
 testing <- newFeaturesData(testing)
+
+# смотрим типы переменных
+str(testing)
 
 # преобразовываем весь обучающий набор и итоговый тестовый набор
 # перевыгружаем данные
@@ -580,18 +588,51 @@ summary(lr2)
 # комбинации штрафов l1 и l2 (эластичной сети),
 # lambda задает силу штрафа
 hyper_parameters <- list(alpha = c(0, 0.2, 0.4, 0.6, 1))
-glm_grid <- h2o.grid(algorithm = "glm", grid_id = "gridresults", hyper_params = hyper_parameters, 
+glm_grid <- h2o.grid(algorithm = "glm", grid_id = "grid", 
+                     hyper_params = hyper_parameters, 
                      training_frame = train, validation_frame = valid, x = c(2:65), y = "TARGET",
-                     lambda_search = TRUE, family = "binomial")
+                     lambda_search=TRUE, family = "binomial")
 
 # выводим результаты решетчатого поиска
 summary(glm_grid)
 
 # сортируем по AUC
-sortedGrid <- h2o.getGrid("gridresults", sort_by = "auc", decreasing = TRUE)
+sortedGrid <- h2o.getGrid("grid", sort_by = "auc", decreasing = TRUE)
 
 # выводим результаты решетчатого поиска,
 # отсортировав по убыванию AUC
 sortedGrid
+
+
+# снова выполняем решетчатый поиск, но теперь дополнительно
+# зададим список предикторов для рассмотрения парных
+# взаимодействий
+glm_grid2 <- h2o.grid(algorithm = "glm", grid_id = "grid2", 
+                     hyper_params = hyper_parameters, 
+                     training_frame = train, validation_frame = valid, x = c(2:65), y = "TARGET",
+                     lambda_search=TRUE, family = "binomial",
+                     interactions=c("GENDER", "EDUCATION", "REGION_NM", "REG_ADDRESS_PROVINCE"))
+
+# выводим результаты решетчатого поиска
+summary(glm_grid2)
+
+# сортируем по AUC
+sortedGrid2 <- h2o.getGrid("grid2", sort_by = "auc", decreasing = TRUE)
+
+# выводим результаты решетчатого поиска,
+# отсортировав по убыванию AUC
+sortedGrid2
+
+# записываем идентификатор наилучшей модели
+best_model_id <- sortedGrid2@model_ids[[1]]
+
+# извлекаем наилучшую модель
+best_model <- h2o.getModel(best_model_id)
+
+# смотрим наилучшую модель
+best_model
+
+
+
 
 
