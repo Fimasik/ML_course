@@ -489,7 +489,6 @@ OTPset$AGREEMENT_RK = NULL
 OTPset <- preProcessData(OTPset)
 
 # применяем функцию, укрупняющую редкие
-
 # категории
 OTPset <- replaceRareClass(OTPset)
 
