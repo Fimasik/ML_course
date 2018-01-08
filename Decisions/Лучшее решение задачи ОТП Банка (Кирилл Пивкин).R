@@ -477,6 +477,27 @@ testing <- newFeaturesData(testing)
 # смотрим типы переменных
 str(testing)
 
+set.seed(15111)
+ctrl = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, 
+                    summaryFunction = twoClassSummary)
+grid <- expand.grid(
+  .mtry = c(1, 3, 5, 8),
+  .splitrule = "gini"
+)
+
+modelWeights <- ifelse(training$TARGET == "noResponse",
+                       (1/prop.table(table(training$TARGET))[1]) * 0.5,
+                       (1/prop.table(table(training$TARGET))[2]) * 0.5)
+
+rf_gridsearch <- train(TARGET ~ ., data = training,
+                       method = "ranger", importance = "impurity",
+                       min.node.size = 50,
+                       weights = modelWeights,
+                       metric = "ROC", 
+                       trControl = ctrl, tuneGrid = grid)
+
+print(rf_gridsearch)
+
 # преобразовываем весь обучающий набор и итоговый тестовый набор
 # перевыгружаем данные
 OTPset <- read.csv2("Credit_OTP.csv", stringsAsFactors = F)
