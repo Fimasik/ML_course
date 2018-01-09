@@ -478,11 +478,11 @@ testing <- newFeaturesData(testing)
 str(testing)
 
 set.seed(15111)
-ctrl = trainControl(method = "repeatedcv", number=5, repeats=2, classProbs=T, 
+ctrl = trainControl(method = "repeatedcv", number=5, repeats=1, classProbs=T, 
                     summaryFunction = twoClassSummary)
 gridSet <- expand.grid(
-  .mtry = c(12, 16),
-  .min.node.size =c(40, 50, 60, 70),
+  .mtry = c(20, 24, 28, 32),
+  .min.node.size =c(100, 110),
   .splitrule = "gini"
 )
 
@@ -612,11 +612,6 @@ ranger_gridsearch <- train(TARGET ~ ., data = training, num.trees=800,
                            trControl = ctrl, tuneGrid = gridSet)
 
 print(ranger_gridsearch)
-
-
-
-
-
 
 
 # преобразовываем весь обучающий набор и итоговый тестовый набор
