@@ -477,6 +477,7 @@ testing <- newFeaturesData(testing)
 # смотрим типы переменных
 str(testing)
 
+# настраиваем параметры решетчатого поиска
 set.seed(15111)
 ctrl = trainControl(method = "repeatedcv", number=5, repeats=1, classProbs=T, 
                     summaryFunction = twoClassSummary)
@@ -604,13 +605,19 @@ modelInfo <- list(label = "Random Forest",
                   sort = function(x) x[order(x[,1]),])
 
 
-
+# запускаем решетчатый поиск, перебираем 
+# параметры mtry и min.node.size пакета
+# ranger (то есть количество случайно
+# обираемых предикторов для разбиения и
+# минимальное количество наблюдений в 
+# терминальном узле для случайного леса)
 ranger_gridsearch <- train(TARGET ~ ., data = training, num.trees=800,
                            method = modelInfo, importance = "impurity",
                            weights = modelWeights,
                            metric = "ROC", 
                            trControl = ctrl, tuneGrid = gridSet)
 
+# печатаем результаты решетчатого поиска
 print(ranger_gridsearch)
 
 
@@ -702,19 +709,19 @@ valid <- as.h2o(OTPset_test)
 str(train)
 
 # строим модель логистической регрессии
-lr1 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
+glm1 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
                x=c(2:65), y=1, seed = 1000000)
 
 # смотрим модель
-summary(lr1)
+summary(glm1)
 
 # строим модель логистической регрессии 
 # с перебором lambda - силы штрафа 
-lr2 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
+glm2 <- h2o.glm(family= "binomial", training_frame = train, validation_frame = valid, 
                x=c(2:65), y=1, seed = 1000000, lambda_search = TRUE)
 
 # смотрим модель
-summary(lr2)
+summary(glm2)
 
 # выполняем решетчатый поиск с перебором alpha и lambda,
 # alpha задает тип регуляризации: значение 1 соответствует 
@@ -724,43 +731,44 @@ summary(lr2)
 # комбинации штрафов l1 и l2 (эластичной сети),
 # lambda задает силу штрафа
 hyper_parameters <- list(alpha = c(0, 0.2, 0.4, 0.6, 1))
-glm_grid <- h2o.grid(algorithm = "glm", grid_id = "grid", 
+glm_grid <- h2o.grid(algorithm = "glm", grid_id = "glm_grid", 
                      hyper_params = hyper_parameters, 
                      training_frame = train, validation_frame = valid, x = c(2:65), y = "TARGET",
-                     lambda_search=TRUE, family = "binomial")
+                     lambda_search=TRUE, family = "binomial", seed = 1000000)
 
 # выводим результаты решетчатого поиска
 summary(glm_grid)
 
 # сортируем по AUC
-sortedGrid <- h2o.getGrid("grid", sort_by = "auc", decreasing = TRUE)
+sorted_glm_grid <- h2o.getGrid("glm_grid", sort_by = "auc", decreasing = TRUE)
 
 # выводим результаты решетчатого поиска,
 # отсортировав по убыванию AUC
-sortedGrid
+sorted_glm_grid
 
 
 # снова выполняем решетчатый поиск, но теперь дополнительно
 # зададим список предикторов для рассмотрения парных
 # взаимодействий
-glm_grid2 <- h2o.grid(algorithm = "glm", grid_id = "grid2", 
+glm_grid2 <- h2o.grid(algorithm = "glm", grid_id = "glm_grid2", 
                      hyper_params = hyper_parameters, 
                      training_frame = train, validation_frame = valid, x = c(2:65), y = "TARGET",
                      lambda_search=TRUE, family = "binomial",
-                     interactions=c("GENDER", "EDUCATION", "REGION_NM", "REG_ADDRESS_PROVINCE"))
+                     interactions=c("GENDER", "EDUCATION", "REGION_NM", "REG_ADDRESS_PROVINCE"),
+                     seed = 1000000)
 
 # выводим результаты решетчатого поиска
 summary(glm_grid2)
 
 # сортируем по AUC
-sortedGrid2 <- h2o.getGrid("grid2", sort_by = "auc", decreasing = TRUE)
+sorted_glm_grid2 <- h2o.getGrid("glm_grid2", sort_by = "auc", decreasing = TRUE)
 
 # выводим результаты решетчатого поиска,
 # отсортировав по убыванию AUC
-sortedGrid2
+sorted_glm_grid2
 
 # записываем идентификатор наилучшей модели
-best_model_id <- sortedGrid2@model_ids[[1]]
+best_model_id <- sorted_glm_grid2@model_ids[[1]]
 
 # извлекаем наилучшую модель
 best_model <- h2o.getModel(best_model_id)
@@ -768,7 +776,104 @@ best_model <- h2o.getModel(best_model_id)
 # смотрим наилучшую модель
 best_model
 
+# строим модель градиентного бустинга, перечислены 
+# значения параметров по умолчанию: learn_rate -
+# темп обучения, ntrees - количество деревьев (итераций),
+# max_depth - глубина, min_rows - количество
+# наблюдений в терминальном узле, sample_rate -
+# процент отобранных строк для построения дерева,
+# col_sample_rate - процент случайно отбираемых столбцов 
+# для каждого разбиения узла, col_sample_rate_per_tree -
+# процент случайно отбираемых столбцов для каждого дерева,
+# col_sample_rate_per_tree - относительное изменение 
+# отбора столбцов для каждого уровня дерева
+gbm1 <- h2o.gbm(learn_rate=0.1, ntrees = 50, max_depth = 5, min_rows = 10,
+                sample_rate = 1, col_sample_rate = 1,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 1,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm1)
 
 
+# попробуем уменьшить глубину
+gbm2 <- h2o.gbm(learn_rate=0.1, ntrees = 50, max_depth = 2, min_rows = 10,
+                sample_rate = 1, col_sample_rate = 1,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 1,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
 
+summary(gbm2)
+
+
+# теперь попробуем увеличить минимальное 
+# количество наблюдений в листе
+gbm3 <- h2o.gbm(learn_rate=0.1, ntrees = 50, max_depth = 2, min_rows = 115,
+                sample_rate = 1, col_sample_rate = 1,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 1,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm3)
+
+
+# теперь попробуем уменьшить процент отбираемых 
+# столбцов (вносим рандомизацию)
+gbm4 <- h2o.gbm(learn_rate=0.1, ntrees = 50, max_depth = 2, min_rows = 115,
+                sample_rate = 1, col_sample_rate = 0.14,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 1,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm4)
+
+
+# теперь попробуем уменьшить процент отбираемых 
+# столбцов для каждого дерева (вносим рандомизацию)
+gbm5 <- h2o.gbm(learn_rate=0.1, ntrees = 50, max_depth = 2, min_rows = 115,
+                sample_rate = 1, col_sample_rate = 0.14,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 0.25,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm5)
+
+# возвращаемся к базовым параметрам, увеличиваем learn_rate
+gbm6 <- h2o.gbm(learn_rate=0.2, ntrees = 50, max_depth = 2, min_rows = 115,
+                sample_rate = 1, col_sample_rate = 0.14,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 0.25,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm6)
+
+
+# поскольку мы немного увеличили learn_rate, можно 
+# немного снизить количество итераций
+gbm7 <- h2o.gbm(learn_rate=0.2, ntrees = 45, max_depth = 2, min_rows = 115,
+                sample_rate = 1, col_sample_rate = 0.14,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 0.25,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm7)
+
+
+# глубину пропускаем, увеличиваем минимальное 
+# количество наблюдений в листе
+gbm8 <- h2o.gbm(learn_rate=0.2, ntrees = 45, max_depth = 2, min_rows = 125,
+                sample_rate = 1, col_sample_rate = 0.14,
+                col_sample_rate_change_per_level = 1, 
+                col_sample_rate_per_tree = 0.25,
+                training_frame = train, validation_frame = valid, 
+                x=c(2:65), y=1, seed = 1000000)
+
+summary(gbm8)
 
